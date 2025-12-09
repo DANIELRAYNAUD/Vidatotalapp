@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-background text-text-primary;
+        font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+    }
+}
+
+@layer utilities {
+    .glass-card {
+        @apply bg-background-card backdrop-blur-card border border-white/10;
+    }
+
+    .glass-hover {
+        @apply transition-all duration-300 hover:shadow-card-hover hover:scale-[1.02];
+    }
+
+    .gradient-green-gold {
+        background: linear-gradient(135deg, #2d7a5f 0%, #8b7355 100%);
+    }
+
+    .gradient-teal {
+        background: linear-gradient(135deg, #1e5f5a 0%, #0d0d0d 100%);
+    }
+
+    .gradient-orange {
+        background: linear-gradient(135deg, #8b5a3f 0%, #0d0d0d 100%);
+    }
+
+    .gradient-blue {
+        background: linear-gradient(135deg, #1e3a5f 0%, #0d0d0d 100%);
+    }
+
+    .gradient-purple {
+        background: linear-gradient(135deg, #7c3aed 0%, #0d0d0d 100%);
+    }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

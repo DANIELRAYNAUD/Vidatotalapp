@@ -1,0 +1,100 @@
+﻿import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+})
+
+// Interceptor de request - adiciona token automaticamente
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('auth_token')
+        if (token && config.headers) {
+            config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+// Interceptor de response - trata erros 401 (logout automÃ¡tico)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Token invÃ¡lido ou expirado - fazer logout
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('auth_user')
+            window.location.href = '/login'
+        }
+        return Promise.reject(error)
+    }
+)
+
+// ===== AUTH =====
+export const authAPI = {
+    register: (data: { email: string; nome: string; senha: string }) =>
+        api.post('/auth/register', data),
+
+    login: (data: { email: string; senha: string }) =>
+        api.post('/auth/login', data),
+
+    me: () =>
+        listar: () => api.get('/habitos'),
+            criar: (data: any) => api.post('/habitos', data),
+                atualizar: (id: string, data: any) => api.put(`/habitos/${id}`, data),
+                    deletar: (id: string) => api.delete(`/habitos/${id}`),
+                        toggle: (id: string, data?: any) => api.post(`/habitos/${id}/toggle`, data || {}),
+                            estatisticas: () => api.get('/habitos/stats/overview'),
+                                listarRegistros: (id: string, dataInicio?: string, dataFim?: string) => {
+                                    const params = new URLSearchParams()
+                                    if (dataInicio) params.append('dataInicio', dataInicio)
+                                    if (dataFim) params.append('dataFim', dataFim)
+                                    return api.get(`/habitos/${id}/registros?${params}`)
+                                },
+}
+
+// ===== SAÃšDE =====
+
+export const saudeAPI = {
+    // MÃ©tricas
+    listarMetricas: (filtros?: {
+        tipo?: string
+        dataInicio?: string
+        dataFim?: string
+    }) => {
+        const params = new URLSearchParams()
+        if (filtros?.tipo) params.append('tipo', filtros.tipo)
+        if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio)
+        if (filtros?.dataFim) params.append('dataFim', filtros.dataFim)
+        return api.get(`/saude/metricas?${params}`)
+    },
+
+    criarMetrica: (data: any) =>
+        api.post('/saude/metricas', data),
+
+    deletarMetrica: (id: string) =>
+        api.delete(`/saude/metricas/${id}`),
+
+    // Medicamentos
+    listarMedicamentos: () =>
+        api.get('/saude/medicamentos'),
+
+    criarMedicamento: (data: any) =>
+        api.post('/saude/medicamentos', data),
+
+    atualizarMedicamento: (id: string, data: any) =>
+        api.put(`/saude/medicamentos/${id}`, data),
+
+    deletarMedicamento: (id: string) =>
+        api.delete(`/saude/medicamentos/${id}`),
+
+    // Consultas
+    listarConsultas: () =>
+        api.get('/saude/consultas'),

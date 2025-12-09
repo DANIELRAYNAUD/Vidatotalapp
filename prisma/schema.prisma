@@ -1,0 +1,988 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===== USUÁRIO & CONFIGURAÇÕES =====
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  nome          String
+  senha         String   // Hash bcrypt
+  role          String   @default("user") // admin, user
+  aprovado      Boolean  @default(false)
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  configuracoes Settings?
+  habitos       Habito[]
+  eventos       Evento[]
+  projetos      Projeto[]
+  tarefas       Tarefa[]
+  transacoes    Transacao[]
+  refeicoes     Refeicao[]
+  treinos       Treino[]
+  registrosSono RegistroSono[]
+  metricasSaude MetricaSaude[]
+  livros        Livro[]
+  trilhasAprendizado TrilhaAprendizado[]
+  notas         Nota[]
+  sessoesFoco   SessaoFoco[]
+  metas         Meta[]
+  servicoSenhor ServicoSenhor[]
+}
+
+model Settings {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tema             String  @default("dark")
+  idioma           String  @default("pt-BR")
+  fuso             String  @default("America/Sao_Paulo")
+  moeda            String  @default("BRL")
+  
+  notificacoesAtivas Boolean @default(true)
+  somAtivo           Boolean @default(true)
+  
+  tipoMusicaFoco     String  @default("classica")
+  pomodoroTrabalho   Int     @default(25)
+  pomodoroPausaCurta Int     @default(5)
+  pomodoroPausaLonga Int     @default(15)
+}
+
+// ===== HÁBITOS =====
+model Habito {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nome        String
+  descricao   String?
+  icone       String
+  cor         String
+  categoria   String
+  
+  frequencia  String   // diaria, semanal, personalizada
+  diasSemana  String?  // JSON array para Seg-Sex [1,2,3,4,5]
+  valorMeta   Int      @default(1)
+  
+  lembrete    Boolean  @default(false)
+  horarioLembrete String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  registros   RegistroHabito[]
+}
+
+model RegistroHabito {
+  id        String   @id @default(uuid())
+  habitoId  String
+  habito    Habito   @relation(fields: [habitoId], references: [id], onDelete: Cascade)
+  
+  data      DateTime @default(now())
+  completo  Boolean  @default(false)
+  valor     Int      @default(1)
+  notas     String?
+  
+  @@unique([habitoId, data])
+}
+
+// ==
+
+// ===== CALENDÁRIO & EVENTOS =====
+model Evento {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  titulo      String
+  descricao   String?
+  local       String?
+  
+  inicio      DateTime
+  fim         DateTime
+  diaInteiro  Boolean  @default(false)
+  
+  categoria   String   // trabalho, pessoal, saude, estudo, social
+  cor         String
+  
+  recorrencia String?  // JSON: {tipo: "diaria", intervalo: 1, dataFim: "2025-12-31"}
+  lembretes   String?  // JSON: [15, 30, 60] (minutos antes)
+  
+  linkReuniao String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== PROJETOS & TAREFAS =====
+model Projeto {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nome        String
+  descricao   String?
+  categoria   String
+  cor         String
+  gradiente   String   // JSON: {de: "#2d7a5f", para: "#8b7355"}
+  
+  status      String   @default("ativo") // ativo, pausado, completo, arquivado
+  progresso   Int      @default(0)
+  
+  dataInicio  DateTime?
+  prazo       DateTime?
+  
+  orcamento   Float?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  tarefas     Tarefa[]
+}
+
+model Tarefa {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projetoId   String?
+  projeto     Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  
+  titulo      String
+  descricao   String?
+  
+  status      String   @default("fazer") // fazer, fazendo, revisar, feito
+  prioridade  String   @default("normal") // baixa, normal, alta, urgente
+  
+  prazo       DateTime?
+  
+  tags        String?  // JSON array
+  
+  tempoEstimado Int?   // minutos
+  tempoReal     Int?   // minutos
+  
+  tarefaPaiId   String?
+  subtarefas    String? // JSON array de objetos subtarefa
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completadaEm DateTime?
+}
+
+// ===== FINANÇAS =====
+model Conta {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  nome        String
+  tipo        String   // corrente, poupanca, investimento
+  saldo       Float
+  moeda       String   @default("BRL")
+  
+  instituicao String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transacoes  Transacao[]
+}
+
+model CartaoCredito {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String   // "Nubank", "Itaú Platinum"
+  bandeira        String   // visa, mastercard, elo, amex
+  limite          Float
+  
+  diaFechamento   Int      // 1-31 (dia de fechamento da fatura)
+  diaVencimento   Int      // 1-31 (dia de vencimento)
+  
+  cor             String   @default("bg-blue-500")
+  ativo           Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  transacoes      Transacao[]
+  
+  @@index([userId])
+}
+
+model Transacao {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  contaId     String?
+  conta       Conta?   @relation(fields: [contaId], references: [id], onDelete: SetNull)
+  
+  cartaoId    String?
+  cartao      CartaoCredito? @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+  
+  tipo        String   // receita, despesa
+  valor       Float
+  categoria   String
+  descricao   String?
+  
+  data        DateTime
+  status      String   @default("efetivada") // efetivada, pendente, cancelada
+  
+  // Parcelamento
+  isParcelada     Boolean  @default(false)
+  numeroParcela   Int?     // 1, 2, 3... (número da parcela atual)
+  totalParcelas   Int?     // Total de parcelas (ex: 12)
+  grupoParcelasId String?  // ID compartilhado entre parcelas da mesma compra
+  
+  // Fatura de Cartão
+  mesReferencia   String?  // "2025-12" (mês da fatura do cartão)
+  
+  // Cross-linking com outros módulos
+  vinculoModulo   String?  // servico_medico, casamento, projeto
+  vinculoId       String?  // ID do registro no módulo vinculado
+  vinculoLabel    String?  // Label amigável para exibição (ex: "Plantão Hospital X 01/12")
+  
+  tags        String?  // JSON array
+  receiptUrl  String?
+  
+  recorrente  Boolean  @default(false)
+  recorrencia String?  // JSON: {frequencia: "mensal", intervalo: 1}
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, data])
+  @@index([cartaoId, mesReferencia])
+  @@index([grupoParcelasId])
+  @@index([vinculoModulo, vinculoId])
+}
+
+model Orcamento {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  categoria   String
+  limite      Float
+  periodo     String   @default("mensal") // semanal, mensal, anual
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
+// ===== NUTRIÇÃO =====
+model Refeicao {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  data        DateTime
+  tipoRefeicao String  // cafe_manha, lanche_manha, almoco, lanche_tarde, jantar
+  
+  alimentos   String   // JSON array de objetos: {nome, quantidade, unidade, calorias, proteina, carbo, gordura}
+  
+  totalCalorias Float
+  totalProteina Float
+  totalCarbo    Float
+  totalGordura  Float
+  
+  fotoUrl     String?
+  notas       String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model Receita {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  nome        String
+  descricao   String?
+  fotoUrl     String?
+  
+  tempoPreparo Int     // minutos
+  dificuldade  String  // facil, media, dificil
+  
+  ingredientes String  // JSON array
+  instrucoes   String  // JSON array de passos
+  
+  porcoes     Int
+  caloriasPorPorcao Float
+  macrosPorPorcao   String // JSON: {proteina, carbo, gordura}
+  
+  tags        String?  // JSON array
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== TREINOS =====
+model PlanoTreino {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  nome        String
+  descricao   String?
+  tipo        String   // PPL, ABC, SuperiorInferior, CorpoInteiro
+  
+  diasPorSemana Int
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Treino {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  planoId     String?
+  
+  nome        String
+  data        DateTime
+  duracao     Int      // segundos
+  
+  exercicios  String   // JSON array: [{exercicioId, series: [{reps, peso, descanso}]}]
+  
+  volumeTotal Float    // kg levantados
+  notas       String?
+  
+  completo    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+}
+
+model Exercicio {
+  id          String   @id @default(uuid())
+  
+  nome        String
+  descricao   String?
+  grupoMuscular String // peito, costas, pernas, ombros, bracos, core
+  equipamento   String // barra, halter, maquina, peso_corporal, cabo
+  dificuldade   String // iniciante, intermediario, avancado
+  
+  videoUrl    String?
+  instrucoes  String? // JSON array de passos
+  
+  createdAt   DateTime @default(now())
+}
+
+// ===== SAÚDE =====
+model MetricaSaude {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  data        DateTime
+  tipo        String   // peso, gordura_corporal, pressao_arterial, freq_cardiaca, glicose, etc
+  valor       Float
+  unidade     String
+  
+  contexto    String?  // jejum, pos_treino, etc
+  notas       String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model Medicamento {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  nome        String
+  dosagem     String
+  frequencia  String   // JSON: {horarios: ["08:00", "20:00"], dias: [1,2,3,4,5,6,7]}
+  
+  dataInicio  DateTime
+  dataFim     DateTime?
+  
+  estoque     Int?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ConsultaMedica {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  especialidade String
+  medico        String?
+  local         String?
+  
+  dataHora    DateTime
+  
+  notas       String?
+  anexos      String?  // JSON array de URLs
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== SONO =====
+model RegistroSono {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  data        DateTime // data de acordar
+  
+  horaDormir  DateTime
+  horaAcordar DateTime
+  
+  duracao     Int      // minutos
+  qualidade   Int      // escala 1-5
+  
+  fases       String?  // JSON: {acordado: 12, leve: 180, profundo: 120, rem: 90}
+  
+  interrupcoes Int    @default(0)
+  
+  fatores     String?  // JSON: {cafeina: true, exercicio: true, stress: 7, alcool: false}
+  
+  notas       String?
+  
+  createdAt   DateTime @default(now())
+}
+
+// ===== LEITURA =====
+model Livro {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  titulo      String
+  autor       String
+  isbn        String?
+  capaUrl     String?
+  
+  categoria   String
+  tags        String?  // JSON array
+  
+  totalPaginas Int
+  paginaAtual  Int     @default(0)
+  
+  status      String   @default("ler") // lendo, ler, completo, abandonado
+  
+  avaliacao   Int?     // 1-5
+  
+  dataInicio  DateTime?
+  dataFim     DateTime?
+  
+  notas       String?
+  destaques   String?  // JSON array de {pagina, texto, nota}
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  sessoes     SessaoLeitura[]
+}
+
+model SessaoLeitura {
+  id          String   @id @default(uuid())
+  livroId     String
+  livro       Livro    @relation(fields: [livroId], references: [id], onDelete: Cascade)
+  
+  data        DateTime @default(now())
+  duracao     Int      // segundos
+  paginasLidas Int
+  
+  paginaInicio Int
+  paginaFim    Int
+  
+  notas       String?
+}
+
+// ===== APRENDIZADO =====
+model TrilhaAprendizado {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  assunto     String   // ingles, espanhol, medicina, literatura, etc
+  nivel       String   // iniciante, intermediario, avancado, proficiente
+  
+  progresso   Int      @default(0) // 0-100
+  
+  moduloAtual String?
+  
+  sequencia   Int      @default(0)
+  
+  metaDiaria  Int      @default(30) // minutos
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  sessoes     SessaoEstudo[]
+}
+
+model SessaoEstudo {
+  id            String           @id @default(uuid())
+  trilhaId      String
+  trilha        TrilhaAprendizado @relation(fields: [trilhaId], references: [id], onDelete: Cascade)
+  
+  data          DateTime         @default(now())
+  duracao       Int              // segundos
+  
+  modulo        String
+  licao         String
+  
+  pontuacao     Int?             // 0-100
+  xpGanho       Int              @default(0)
+  
+  notas         String?
+}
+
+model Flashcard {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  assunto     String
+  baralho     String
+  
+  frente      String
+  verso       String
+  
+  dificuldade Int      @default(0) // 0-5, aumenta com respostas corretas
+  proximaRevisao DateTime
+  
+  vezesRevisado Int    @default(0)
+  acertos       Int    @default(0)
+  
+  tags        String?  // JSON array
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== NOTAS =====
+model Nota {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  titulo      String
+  conteudo    String   // Rich text HTML ou Markdown
+  
+  pastaId     String?
+  pasta       Pasta?   @relation(fields: [pastaId], references: [id], onDelete: SetNull)
+  
+  tags        String?  // JSON array
+  
+  favorito    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Pasta {
+  id          String   @id @default(uuid())
+  userId      String
+  
+  nome        String
+  cor         String?
+  icone       String?
+  
+  pastaPaiId  String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  notas       Nota[]
+}
+
+// ===== FOCO & FLOW STATE =====
+model SessaoFoco {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  tipo        String   @default("pomodoro") // pomodoro, flow, trabalho_profundo
+  
+  inicio      DateTime
+  fim         DateTime?
+  duracao     Int?     // segundos
+  
+  tipoMusica  String?  // classica_432hz, lofi, ambiente, binaural, etc
+  
+  tarefaId    String?
+  projetoId   String?
+  
+  completo    Boolean  @default(false)
+  
+  notas       String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model MusicaFoco {
+  id          String   @id @default(uuid())
+  
+  nome        String
+  artista     String?
+  tipo        String   // classica, lofi, ambiente, natureza, binaural, ruido_branco
+  
+  frequencia  String?  // 432hz, beta_15hz, alpha_10hz, etc
+  duracao     Int      // segundos
+  
+  caminhoArquivo String
+  
+  tags        String?  // JSON array: ["foco", "estudo", "meditacao"]
+  
+  createdAt   DateTime @default(now())
+}
+
+// ===== METAS =====
+model Meta {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  categoria   String   // carreira, saude, financas, aprendizado, pessoal
+  
+  titulo      String
+  descricao   String?
+  
+  valorMeta   Float?
+  valorAtual  Float?
+  unidade     String?
+  
+  prazo       DateTime?
+  
+  status      String   @default("ativa") // ativa, alcancada, cancelada
+  
+  marcos      String?  // JSON array: [{titulo, valor, data, completo}]
+  
+  tarefasVinculadas String?  // JSON array de IDs de tarefas
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== SERVIÇO AO SENHOR =====
+model ServicoSenhor {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  data        DateTime
+  tipo        String   // 'reunioes', 'alimento_diario', 'grito_guerra', 'conferencias', 'ofertas', 'oracoes_diarias', 'jejum', 'imersao_palavra', 'comunhao_irmaos', 'servir_igreja'
+  titulo      String
+  descricao   String?
+  duracao     Int?     // minutos
+  valor       Float?   // para ofertas
+  reflexao    String?  // reflexão pessoal
+  versiculo   String?  // versículo do dia
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([data])
+}
+
+// ===== SERVIÇO MÉDICO =====
+model EmpresaMedica {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String
+  tipo            String   // hospital, clinica, consultorio, ambulatorio
+  cnpj            String?
+  endereco        String?
+  contato         String?
+  telefone        String?
+  email           String?
+  responsavel     String?
+  
+  diaPagamento    Int      // 1-31
+  emiteNota       Boolean  @default(false)
+  valorPadrao     Float?
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  plantoes        PlantaoMedico[]
+  
+  @@index([userId])
+}
+
+model PlantaoMedico {
+  id              String   @id @default(uuid())
+  userId          String
+  empresaId       String
+  empresa         EmpresaMedica @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  
+  data            DateTime
+  blocoHorario    String   // 00-06, 06-12, 12-18, 18-24
+  tipoServico     String   // plantao, ambulatorio, consultorio, cirurgia, interconsulta, homecare
+  valor           Float
+  status          String   @default("agendado") // agendado, concluido, cancelado, pago
+  numAtendimentos Int?
+  observacoes     String?
+  
+  transacaoId     String?  // Link para transação financeira
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, data])
+}
+
+// ===== FAMÍLIA =====
+model MembroFamilia {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String
+  relacao         String   // esposa, filho1, filho2, filho3
+  dataNascimento  DateTime
+  fotoUrl         String?
+  personalidade   String?  // JSON
+  interesses      String?  // JSON array
+  
+  // Escola (para filhos)
+  escolaId        String?
+  escola          Escola?  @relation(fields: [escolaId], references: [id], onDelete: SetNull)
+  serie           String?
+  professor       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  consultasMedicas ConsultaMedicaFamilia[]
+  exames          ExameFamilia[]
+  boletins        BoletimEscolar[]
+  terapias        TerapiaFamilia[]
+  
+  @@index([userId])
+}
+
+model Escola {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String
+  endereco        String?
+  telefone        String?
+  email           String?
+  site            String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  membros         MembroFamilia[]
+  
+  @@index([userId])
+}
+
+model BoletimEscolar {
+  id              String   @id @default(uuid())
+  membroFamiliaId String
+  membro          MembroFamilia @relation(fields: [membroFamiliaId], references: [id], onDelete: Cascade)
+  
+  periodo         String   // bimestre, trimestre, semestre
+  numero          Int      // 1, 2, 3, 4
+  ano             Int
+  arquivoUrl      String?
+  notas           String   // JSON: {materia: nota}
+  comentarios     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([membroFamiliaId])
+}
+
+model ConsultaMedicaFamilia {
+  id              String   @id @default(uuid())
+  membroFamiliaId String
+  membro          MembroFamilia @relation(fields: [membroFamiliaId], references: [id], onDelete: Cascade)
+  
+  dataHora        DateTime
+  especialidade   String
+  medico          String?
+  local           String?
+  telefone        String?
+  motivo          String?
+  observacoes     String?
+  retorno         DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([membroFamiliaId])
+}
+
+model ExameFamilia {
+  id              String   @id @default(uuid())
+  membroFamiliaId String
+  membro          MembroFamilia @relation(fields: [membroFamiliaId], references: [id], onDelete: Cascade)
+  
+  data            DateTime
+  tipoExame       String
+  resultado       String?
+  arquivoUrl      String?
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([membroFamiliaId])
+}
+
+model TerapiaFamilia {
+  id              String   @id @default(uuid())
+  membroFamiliaId String
+  membro          MembroFamilia @relation(fields: [membroFamiliaId], references: [id], onDelete: Cascade)
+  
+  tipo            String   // fono, psico, fisio, ocupacional, outro
+  profissional    String
+  local           String?
+  telefone        String?
+  diaHorario      String   // JSON: [{dia: "segunda", horario: "14:00"}]
+  dataInicio      DateTime
+  ativo           Boolean  @default(true)
+  progresso       String?
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([membroFamiliaId])
+}
+
+model Funcionario {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String
+  tipo            String   // empregada, baba
+  cpf             String?
+  contato         String?
+  endereco        String?
+  diasTrabalho    String   // JSON array: ["segunda", "terca"]
+  horario         String   // JSON: {entrada: "08:00", saida: "17:00"}
+  salario         Float
+  dataAdmissao    DateTime
+  ativo           Boolean  @default(true)
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model Pet {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  nome            String
+  especie         String   // cachorro, gato, passaro, etc
+  raca            String?
+  dataNascimento  DateTime?
+  fotoUrl         String?
+  sexo            String?
+  cor             String?
+  peso            Float?
+  veterinario     String?
+  telefoneVet     String?
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  cuidados        CuidadoPet[]
+  
+  @@index([userId])
+}
+
+model CuidadoPet {
+  id              String   @id @default(uuid())
+  petId           String
+  pet             Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  
+  tipo            String   // vacina, vermifugo, consulta, banho, tosa, medicamento
+  data            DateTime
+  descricao       String
+  veterinario     String?
+  proximaData     DateTime?
+  valor           Float?
+  observacoes     String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([petId])
+}
+
+// ===== CASAMENTO =====
+model RelacionamentoCasal {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  data            DateTime
+  qualidade       Int      // 1-10
+  tempoJuntos     Int?     // minutos
+  atividadeFeita  String?
+  conversaMeaningful Boolean @default(false)
+  reflexao        String?
+  gratidao        String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([userId, data])
+}
+
+model MetaCasal {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  titulo          String
+  descricao       String?
+  categoria       String   // viagem, financeira, projeto, casa, espiritual, familia
+  prazo           DateTime?
+  status          String   @default("ativa") // ativa, concluida, cancelada
+  progresso       Int      @default(0) // 0-100
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model NotaApreciacao {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  data            DateTime @default(now())
+  tipo            String   // gratidao, amor, memoria, declaracao
+  conteudo        String
+  
+  @@index([userId])
+}
+
+model EventoCasal {
+  id              String   @id @default(uuid())
+  userId          String
+  
+  titulo          String   // Date Night, Aniversário, Viagem
+  data            DateTime
+  tipo            String   // datenight, aniversario, viagem, especial
+  local           String?
+  descricao       String?
+  fotoUrl         String?
+  valor           Float?   // Custo do evento (para cross-link com finanças)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, data])
+}

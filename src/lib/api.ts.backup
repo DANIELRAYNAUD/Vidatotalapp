@@ -1,0 +1,558 @@
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+})
+
+// Interceptor de request - adiciona token automaticamente
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('auth_token')
+        if (token && config.headers) {
+            config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+// Interceptor de response - trata erros 401 (logout automático)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Token inválido ou expirado - fazer logout
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('auth_user')
+            window.location.href = '/login'
+        }
+        return Promise.reject(error)
+    }
+)
+
+// ===== AUTH =====
+export const authAPI = {
+    register: (data: { email: string; nome: string; senha: string }) =>
+        api.post('/auth/register', data),
+
+    login: (data: { email: string; senha: string }) =>
+        api.post('/auth/login', data),
+
+    me: () =>
+        listar: () => api.get('/habitos'),
+            criar: (data: any) => api.post('/habitos', data),
+                atualizar: (id: string, data: any) => api.put(`/habitos/${id}`, data),
+                    deletar: (id: string) => api.delete(`/habitos/${id}`),
+                        toggle: (id: string, data?: any) => api.post(`/habitos/${id}/toggle`, data || {}),
+                            estatisticas: () => api.get('/habitos/stats/overview'),
+                                listarRegistros: (id: string, dataInicio?: string, dataFim?: string) => {
+                                    const params = new URLSearchParams()
+                                    if (dataInicio) params.append('dataInicio', dataInicio)
+                                    if (dataFim) params.append('dataFim', dataFim)
+                                    return api.get(`/habitos/${id}/registros?${params}`)
+                                },
+}
+
+// ===== SAÚDE =====
+
+export const saudeAPI = {
+    // Métricas
+    listarMetricas: (filtros?: {
+        tipo?: string
+        dataInicio?: string
+        dataFim?: string
+    }) => {
+        const params = new URLSearchParams()
+        if (filtros?.tipo) params.append('tipo', filtros.tipo)
+        if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio)
+        if (filtros?.dataFim) params.append('dataFim', filtros.dataFim)
+        return api.get(`/saude/metricas?${params}`)
+    },
+
+    criarMetrica: (data: any) =>
+        api.post('/saude/metricas', data),
+
+    deletarMetrica: (id: string) =>
+        api.delete(`/saude/metricas/${id}`),
+
+    // Medicamentos
+    listarMedicamentos: () =>
+        api.get('/saude/medicamentos'),
+
+    criarMedicamento: (data: any) =>
+        api.post('/saude/medicamentos', data),
+
+    atualizarMedicamento: (id: string, data: any) =>
+        api.put(`/saude/medicamentos/${id}`, data),
+
+    deletarMedicamento: (id: string) =>
+        api.delete(`/saude/medicamentos/${id}`),
+
+    // Consultas
+    listarConsultas: () =>
+        api.get('/saude/consultas'),
+
+    criarConsulta: (data: any) =>
+        api.post('/saude/consultas', data),
+}
+
+// ===== LEITURA =====
+
+export const leituraAPI = {
+    // Livros
+    listarLivros: (status?: string) => {
+        const params = new URLSearchParams()
+        if (status) params.append('status', status)
+        return api.get(`/leitura?${params}`)
+    },
+
+    obterLivro: (id: string) =>
+        api.get(`/leitura/${id}`),
+
+    criarLivro: (data: any) =>
+        api.post('/leitura', data),
+
+    atualizarLivro: (id: string, data: any) =>
+        api.put(`/leitura/${id}`, data),
+
+    deletarLivro: (id: string) =>
+        api.delete(`/leitura/${id}`),
+
+    atualizarProgresso: (id: string, paginaAtual: number) =>
+        api.patch(`/leitura/${id}/progresso`, { paginaAtual }),
+
+    // Sessões
+    listarSessoes: (livroId: string) =>
+        api.get(`/leitura/${livroId}/sessoes`),
+
+    criarSessao: (livroId: string, data: any) =>
+        api.post(`/leitura/${livroId}/sessoes`, data),
+}
+
+// ===== AGENDA =====
+
+export const agendaAPI = {
+    listar: (filtros?: { inicio?: string; fim?: string; categoria?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        if (filtros?.categoria) params.append('categoria', filtros.categoria)
+        return api.get(`/agenda?${params}`)
+    },
+
+    criar: (data: any) =>
+        api.post('/agenda', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/agenda/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/agenda/${id}`),
+}
+
+// ===== FINANÇAS =====
+
+export const financasAPI = {
+    // Contas
+    listarContas: () =>
+        api.get('/financas/contas'),
+
+    criarConta: (data: any) =>
+        api.post('/financas/contas', data),
+
+    atualizarConta: (id: string, data: any) =>
+        api.put(`/financas/contas/${id}`, data),
+
+    deletarConta: (id: string) =>
+        api.delete(`/financas/contas/${id}`),
+
+    // Transações
+    listarTransacoes: (filtros?: {
+        contaId?: string
+        inicio?: string
+        fim?: string
+        tipo?: string
+        categoria?: string
+    }) => {
+        const params = new URLSearchParams()
+        if (filtros?.contaId) params.append('contaId', filtros.contaId)
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        if (filtros?.tipo) params.append('tipo', filtros.tipo)
+        if (filtros?.categoria) params.append('categoria', filtros.categoria)
+        return api.get(`/financas/transacoes?${params}`)
+    },
+
+    criarTransacao: (data: any) =>
+        api.post('/financas/transacoes', data),
+
+    deletarTransacao: (id: string) =>
+        api.delete(`/financas/transacoes/${id}`),
+
+    // Orçamentos
+    listarOrcamentos: () =>
+        api.get('/financas/orcamentos'),
+
+    criarOrcamento: (data: any) =>
+        api.post('/financas/orcamentos', data),
+
+    deletarOrcamento: (id: string) =>
+        api.delete(`/financas/orcamentos/${id}`),
+}
+
+// ===== PROJETOS =====
+
+export const projetosAPI = {
+    // Projetos
+    listar: (filtros?: { status?: string; categoria?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.status) params.append('status', filtros.status)
+        if (filtros?.categoria) params.append('categoria', filtros.categoria)
+        return api.get(`/projetos?${params}`)
+    },
+
+    obter: (id: string) =>
+        api.get(`/projetos/${id}`),
+
+    criar: (data: any) =>
+        api.post('/projetos', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/projetos/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/projetos/${id}`),
+
+    // Tarefas
+    listarTarefas: (projetoId: string) =>
+        api.get(`/projetos/${projetoId}/tarefas`),
+
+    criarTarefa: (data: any) =>
+        api.post('/projetos/tarefas', data),
+
+    atualizarTarefa: (id: string, data: any) =>
+        api.put(`/projetos/tarefas/${id}`, data),
+
+    deletarTarefa: (id: string) =>
+        api.delete(`/projetos/tarefas/${id}`),
+}
+
+// ===== ALIMENTAÇÃO =====
+
+export const alimentacaoAPI = {
+    // Refeições
+    listarRefeicoes: (data?: string) => {
+        const params = new URLSearchParams()
+        if (data) params.append('data', data)
+        return api.get(`/alimentacao/refeicoes?${params}`)
+    },
+
+    criarRefeicao: (data: any) =>
+        api.post('/alimentacao/refeicoes', data),
+
+    deletarRefeicao: (id: string) =>
+        api.delete(`/alimentacao/refeicoes/${id}`),
+
+    // Receitas
+    listarReceitas: () =>
+        api.get('/alimentacao/receitas'),
+
+    criarReceita: (data: any) =>
+        api.post('/alimentacao/receitas', data),
+
+    deletarReceita: (id: string) =>
+        api.delete(`/alimentacao/receitas/${id}`),
+}
+
+// ===== TREINOS =====
+
+export const treinosAPI = {
+    // Treinos
+    listar: (filtros?: { inicio?: string; fim?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        return api.get(`/treinos?${params}`)
+    },
+
+    criar: (data: any) =>
+        api.post('/treinos', data),
+
+    deletar: (id: string) =>
+        api.delete(`/treinos/${id}`),
+
+    // Planos
+    listarPlanos: () =>
+        api.get('/treinos/planos'),
+
+    criarPlano: (data: any) =>
+        api.post('/treinos/planos', data),
+
+    deletarPlano: (id: string) =>
+        api.delete(`/treinos/planos/${id}`),
+
+    // Exercícios
+    listarExercicios: (grupoMuscular?: string) => {
+        const params = new URLSearchParams()
+        if (grupoMuscular) params.append('grupoMuscular', grupoMuscular)
+        return api.get(`/treinos/exercicios?${params}`)
+    },
+}
+
+// ===== SONO =====
+
+export const sonoAPI = {
+    listar: (filtros?: { inicio?: string; fim?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        return api.get(`/sono?${params}`)
+    },
+
+    criar: (data: any) =>
+        api.post('/sono', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/sono/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/sono/${id}`),
+}
+
+// ===== ESTUDOS =====
+
+export const estudosAPI = {
+    // Trilhas
+    listarTrilhas: () =>
+        api.get('/estudos/trilhas'),
+
+    criarTrilha: (data: any) =>
+        api.post('/estudos/trilhas', data),
+
+    atualizarTrilha: (id: string, data: any) =>
+        api.put(`/estudos/trilhas/${id}`, data),
+
+    deletarTrilha: (id: string) =>
+        api.delete(`/estudos/trilhas/${id}`),
+
+    // Sessões
+    listarSessoes: (trilhaId?: string) => {
+        const params = new URLSearchParams()
+        if (trilhaId) params.append('trilhaId', trilhaId)
+        return api.get(`/estudos/sessoes?${params}`)
+    },
+
+    criarSessao: (data: any) =>
+        api.post('/estudos/sessoes', data),
+
+    // Flashcards
+    listarFlashcards: (baralho?: string) => {
+        const params = new URLSearchParams()
+        if (baralho) params.append('baralho', baralho)
+        return api.get(`/estudos/flashcards?${params}`)
+    },
+
+    criarFlashcard: (data: any) =>
+        api.post('/estudos/flashcards', data),
+
+    revisarFlashcard: (id: string, acertou: boolean) =>
+        api.patch(`/estudos/flashcards/${id}/revisar`, { acertou }),
+
+    deletarFlashcard: (id: string) =>
+        api.delete(`/estudos/flashcards/${id}`),
+}
+
+// ===== NOTAS =====
+
+export const notasAPI = {
+    // Pastas
+    listarPastas: () =>
+        api.get('/notas/pastas'),
+
+    criarPasta: (data: any) =>
+        api.post('/notas/pastas', data),
+
+    deletarPasta: (id: string) =>
+        api.delete(`/notas/pastas/${id}`),
+
+    // Notas
+    listar: (filtros?: { pastaId?: string; favorito?: boolean; busca?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.pastaId) params.append('pastaId', filtros.pastaId)
+        if (filtros?.favorito) params.append('favorito', 'true')
+        if (filtros?.busca) params.append('busca', filtros.busca)
+        return api.get(`/notas?${params}`)
+    },
+
+    obter: (id: string) =>
+        api.get(`/notas/${id}`),
+
+    criar: (data: any) =>
+        api.post('/notas', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/notas/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/notas/${id}`),
+}
+
+// ===== FOCO =====
+
+export const focoAPI = {
+    listarSessoes: () =>
+        api.get('/foco/sessoes'),
+
+    criarSessao: (data: any) =>
+        api.post('/foco/sessoes', data),
+
+    listarMusicas: (tipo?: string) => {
+        const params = new URLSearchParams()
+        if (tipo) params.append('tipo', tipo)
+        return api.get(`/foco/musicas?${params}`)
+    },
+}
+
+// ===== METAS =====
+
+export const metasAPI = {
+    listar: (filtros?: { status?: string; categoria?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.status) params.append('status', filtros.status)
+        if (filtros?.categoria) params.append('categoria', filtros.categoria)
+        return api.get(`/metas?${params}`)
+    },
+
+    criar: (data: any) =>
+        api.post('/metas', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/metas/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/metas/${id}`),
+}
+
+// ===== SERVIÇO AO SENHOR =====
+
+export const servicoAPI = {
+    listar: (filtros?: { inicio?: string; fim?: string; tipo?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        if (filtros?.tipo) params.append('tipo', filtros.tipo)
+        return api.get(`/servico?${params}`)
+    },
+
+    criar: (data: any) =>
+        api.post('/servico', data),
+
+    atualizar: (id: string, data: any) =>
+        api.put(`/servico/${id}`, data),
+
+    deletar: (id: string) =>
+        api.delete(`/servico/${id}`),
+
+    estatisticas: () =>
+        api.get('/servico/estatisticas'),
+}
+
+// ===== SERVIÇO MÉDICO =====
+
+export const servicoMedicoAPI = {
+    // Empresas
+    listarEmpresas: () => api.get('/servico-medico/empresas'),
+    criarEmpresa: (data: any) => api.post('/servico-medico/empresas', data),
+    atualizarEmpresa: (id: string, data: any) => api.put(`/servico-medico/empresas/${id}`, data),
+    deletarEmpresa: (id: string) => api.delete(`/servico-medico/empresas/${id}`),
+
+    // Plantões
+    listarPlantoes: (filtros?: any) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        if (filtros?.empresaId) params.append('empresaId', filtros.empresaId)
+        if (filtros?.status) params.append('status', filtros.status)
+        return api.get(`/servico-medico/plantoes?${params}`)
+    },
+    criarPlantao: (data: any) => api.post('/servico-medico/plantoes', data),
+    atualizarPlantao: (id: string, data: any) => api.put(`/servico-medico/plantoes/${id}`, data),
+    deletarPlantao: (id: string) => api.delete(`/servico-medico/plantoes/${id}`),
+
+    estatisticas: () => api.get('/servico-medico/estatisticas'),
+}
+
+// ===== FAMÍLIA =====
+
+export const familiaAPI = {
+    // Membros
+    listarMembros: () => api.get('/familia/membros'),
+    criarMembro: (data: any) => api.post('/familia/membros', data),
+    atualizarMembro: (id: string, data: any) => api.put(`/familia/membros/${id}`, data),
+
+    // Escolas
+    listarEscolas: () => api.get('/familia/escolas'),
+    criarEscola: (data: any) => api.post('/familia/escolas', data),
+
+    // Boletins
+    listarBoletins: (membroId: string) => api.get(`/familia/boletins/${membroId}`),
+    criarBoletim: (data: any) => api.post('/familia/boletins', data),
+
+    // Consultas
+    listarConsultas: (membroId: string) => api.get(`/familia/consultas/${membroId}`),
+    criarConsulta: (data: any) => api.post('/familia/consultas', data),
+
+    // Terapias
+    listarTerapias: (membroId: string) => api.get(`/familia/terapias/${membroId}`),
+    criarTerapia: (data: any) => api.post('/familia/terapias', data),
+
+    // Funcionários
+    listarFuncionarios: () => api.get('/familia/funcionarios'),
+    criarFuncionario: (data: any) => api.post('/familia/funcionarios', data),
+
+    // Pets
+    listarPets: () => api.get('/familia/pets'),
+    criarPet: (data: any) => api.post('/familia/pets', data),
+    registrarCuidadoPet: (petId: string, data: any) => api.post(`/familia/pets/${petId}/cuidados`, data),
+}
+
+// ===== CASAMENTO =====
+
+export const casamentoAPI = {
+    // Check-ins
+    listarCheckins: (filtros?: { inicio?: string; fim?: string }) => {
+        const params = new URLSearchParams()
+        if (filtros?.inicio) params.append('inicio', filtros.inicio)
+        if (filtros?.fim) params.append('fim', filtros.fim)
+        return api.get(`/casamento/checkins?${params}`)
+    },
+    criarCheckin: (data: any) => api.post('/casamento/checkins', data),
+
+    // Metas
+    listarMetas: (status?: string) => {
+        const params = new URLSearchParams()
+        if (status) params.append('status', status)
+        return api.get(`/casamento/metas?${params}`)
+    },
+    criarMeta: (data: any) => api.post('/casamento/metas', data),
+    atualizarMeta: (id: string, data: any) => api.put(`/casamento/metas/${id}`, data),
+
+    // Notas
+    listarNotas: () => api.get('/casamento/notas'),
+    criarNota: (data: any) => api.post('/casamento/notas', data),
+
+    // Eventos
+    listarEventos: () => api.get('/casamento/eventos'),
+    criarEvento: (data: any) => api.post('/casamento/eventos', data),
+
+    estatisticas: () => api.get('/casamento/estatisticas'),
+}
+
+export default api
